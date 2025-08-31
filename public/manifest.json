@@ -1,0 +1,35 @@
+{
+  "name": "Pedersen Toyota Photo Upload",
+  "short_name": "Toyota Photos",
+  "description": "Upload vehicle photos for Pedersen Toyota dealership",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#dc2626",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/toyota-icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/toyota-icon-512.svg", 
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "lang": "en-US",
+  "dir": "ltr",
+  "screenshots": [
+    {
+      "src": "https://via.placeholder.com/390x844/dc2626/ffffff?text=Toyota+Photo+Upload",
+      "sizes": "390x844", 
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ]
+}
