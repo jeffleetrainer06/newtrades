@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#dc2626" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Toyota Photos" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="google" content="notranslate" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="Toyota Photos" />
+    <meta name="msapplication-TileColor" content="#dc2626" />
+    <meta name="msapplication-config" content="/browserconfig.xml" />
+    <meta name="HandheldFriendly" content="true" />
+    <meta name="MobileOptimized" content="width" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/toyota-icon-192.png" />
+    <link rel="apple-touch-startup-image" href="/toyota-icon-512.png" />
+    <link rel="icon" type="image/svg+xml" href="/toyota-icon-192.svg" />
+    <title>Pedersen Dealership - Pre-Owned Vehicles</title>
+    <style>
+      /* Fallback styles in case CSS doesn't load */
+      #root {
+        min-height: 100vh;
+        background-color: #f9fafb;
+      }
+      .loading-fallback {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        font-family: Arial, sans-serif;
+        text-align: center;
+        padding: 20px;
+      }
+    </style>
+    <script>
+      // Prevent Google from intercepting the URL
+      if (window.location.search.includes('google') || document.referrer.includes('google')) {
+        // Clear any Google parameters
+        if (window.history && window.history.replaceState) {
+          window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+        }
+      }
+      
+      // Mobile detection and guidance
+      function isMobile() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      }
+      
+      if (isMobile()) {
+        console.log('Mobile device detected - Toyota system optimized for mobile use');
+      }
+      
+      // Prevent mobile Safari from zooming on input focus
+      document.addEventListener('touchstart', function() {}, {passive: true});
+      
+      // Add loading timeout fallback
+      setTimeout(() => {
+        const root = document.getElementById('root')
+        if (root && (!root.innerHTML || root.innerHTML.trim() === '')) {
+          root.innerHTML = `
+            <div class="loading-fallback">
+              <div>
+                <h1 style="color: #dc2626; margin-bottom: 16px;">Toyota Dealership System</h1>
+                <p style="color: #666; margin-bottom: 16px;">Loading... If this takes too long, please refresh the page.</p>
+                <button onclick="window.location.reload()" style="background: #dc2626; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">
+                  Refresh Page
+                </button>
+              </div>
+            </div>
+          `
+        }
+      }, 10000) // 10 second timeout
+    </script>
+  </head>
+  <body>
+    <div id="root">
+      <div class="loading-fallback">
+        <div>
+          <h1 style="color: #dc2626; margin-bottom: 16px;">Toyota Dealership System</h1>
+          <p style="color: #666;">Loading...</p>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
