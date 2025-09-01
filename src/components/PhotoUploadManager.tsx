@@ -7,7 +7,7 @@ interface PhotoUploadManagerProps {
 }
 
 // Compress image before upload
-function compressImage(file: File, maxWidth: number = 1200, quality: number = 0.5): Promise<File> {
+function compressImage(file: File, maxWidth: number = 1600, quality: number = 0.7): Promise<File> {
   return new Promise((resolve) => {
     try {
       const canvas = document.createElement('canvas')
@@ -36,7 +36,7 @@ function compressImage(file: File, maxWidth: number = 1200, quality: number = 0.
           }
           
           // Also check height and adjust if needed
-          const maxHeight = 900
+          const maxHeight = 1200
           if (height > maxHeight) {
             width = (width * maxHeight) / height
             height = maxHeight
@@ -99,8 +99,8 @@ function VehiclePhotoUpload({ vehicleId, slot, onUploadComplete }: {
     if (!file) return;
     
     // Check initial file size - reject if over 20MB
-    if (file.size > 20 * 1024 * 1024) {
-      alert('Image file is too large (over 20MB). Please take a new photo or select a smaller image.');
+    if (file.size > 50 * 1024 * 1024) {
+      alert('Image file is too large (over 50MB). Please take a new photo or select a smaller image.');
       return;
     }
     
@@ -114,17 +114,17 @@ function VehiclePhotoUpload({ vehicleId, slot, onUploadComplete }: {
       }
 
       // More aggressive compression for production
-      const compressedFile = await compressImage(file, 800, 0.3);
+      const compressedFile = await compressImage(file, 1600, 0.7);
       console.log(`Original size: ${(file.size / 1024 / 1024).toFixed(2)}MB, Compressed size: ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
       
-      // Final size check - must be under 5MB for Supabase
-      if (compressedFile.size > 5 * 1024 * 1024) {
+      // Final size check - must be under 10MB for Supabase
+      if (compressedFile.size > 10 * 1024 * 1024) {
         // Try ultra compression
-        const ultraCompressed = await compressImage(file, 600, 0.2);
+        const ultraCompressed = await compressImage(file, 1200, 0.5);
         console.log(`Ultra compressed size: ${(ultraCompressed.size / 1024 / 1024).toFixed(2)}MB`);
         
-        if (ultraCompressed.size > 5 * 1024 * 1024) {
-          alert('Image is still too large after maximum compression. Please take a new photo with your camera instead of selecting from gallery.');
+        if (ultraCompressed.size > 10 * 1024 * 1024) {
+          alert('Image is still too large after compression. Please try taking a new photo with your camera instead of selecting from gallery.');
           return;
         }
         
@@ -196,8 +196,8 @@ function VehiclePhotoUpload({ vehicleId, slot, onUploadComplete }: {
       }
       
       // Check if file is too large (over 20MB)
-      if (selectedFile.size > 20 * 1024 * 1024) {
-        alert('Image file is too large (over 20MB). Please try taking a new photo with your camera instead of selecting from gallery.');
+      if (selectedFile.size > 50 * 1024 * 1024) {
+        alert('Image file is too large (over 50MB). Please try taking a new photo with your camera instead of selecting from gallery.');
         return;
       }
       
