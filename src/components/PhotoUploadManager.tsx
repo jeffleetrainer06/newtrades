@@ -7,7 +7,7 @@ interface PhotoUploadManagerProps {
 }
 
 // Compress image before upload
-function compressImage(file: File, maxWidth: number = 1600, quality: number = 0.7): Promise<File> {
+function compressImage(file: File, maxWidth: number = 1200, quality: number = 0.5): Promise<File> {
   return new Promise((resolve) => {
     try {
       const canvas = document.createElement('canvas')
@@ -36,7 +36,7 @@ function compressImage(file: File, maxWidth: number = 1600, quality: number = 0.
           }
           
           // Also check height and adjust if needed
-          const maxHeight = 1200
+          const maxHeight = 900
           if (height > maxHeight) {
             width = (width * maxHeight) / height
             height = maxHeight
@@ -108,25 +108,55 @@ function VehiclePhotoUpload({ vehicleId, slot, onUploadComplete }: {
       }
 
       // Compress the image before upload
-      const compressedFile = await compressImage(file, 1600, 0.6);
+      const compressedFile = await compressImage(file, 1200, 0.4);
       console.log(`Original size: ${(file.size / 1024 / 1024).toFixed(2)}MB, Compressed size: ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
       
+      // Final size check after compression
+      if (compressedFile.size > 10 * 1024 * 1024) {
+        // Try even more aggressive compression
+        const superCompressed = await compressImage(file, 800, 0.3);
+        console.log(`Super compressed size: ${(superCompressed.size / 1024 / 1024).toFixed(2)}MB`);
+        
+        if (superCompressed.size > 10 * 1024 * 1024) {
+          alert('Image is still too large after compression. Please try a different photo or take a new one.');
+          return;
+        }
+        
+        // Use the super compressed version
+        const fileName = `${slot}_${Date.now()}.jpg`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('vehicle-photos')
+          .upload(fileName, superCompressed, {
+            upsert: true,
+            contentType: 'image/jpeg',
+            cacheControl: '3600'
+          });
+        
+        if (uploadError) {
+          alert('Storage upload failed: ' + uploadError.message);
+          return;
+        }
+      } else {
+        // Use normally compressed file
+        const fileName = `${slot}_${Date.now()}.jpg`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('vehicle-photos')
+          .upload(fileName, compressedFile, {
+            upsert: true,
+            contentType: 'image/jpeg',
+            cacheControl: '3600'
+          });
+        
+        if (uploadError) {
+          alert('Storage upload failed: ' + uploadError.message);
+          return;
+        }
+      }
       setCompressing(false);
 
       const fileName = `${slot}_${Date.now()}.jpg`;
-      
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('vehicle-photos')
-        .upload(fileName, compressedFile, {
-          upsert: true,
-          contentType: 'image/jpeg',
-          cacheControl: '3600'
-        });
-      
-      if (uploadError) {
-        alert('Storage upload failed: ' + uploadError.message);
-        return;
-      }
 
       const { data: urlData } = supabase.storage
         .from('vehicle-photos')
@@ -171,9 +201,9 @@ function VehiclePhotoUpload({ vehicleId, slot, onUploadComplete }: {
         return;
       }
       
-      // Check if file is extremely large (over 100MB) - very generous limit
-      if (selectedFile.size > 100 * 1024 * 1024) {
-        alert('Image is extremely large. Please try taking a new photo or selecting a different image.');
+      // Check if file is too large (over 50MB)
+      if (selectedFile.size > 50 * 1024 * 1024) {
+        alert('Image file is too large (over 50MB). Please try taking a new photo or selecting a smaller image.');
         return;
       }
       
@@ -228,14 +258,16 @@ function VehiclePhotoUpload({ vehicleId, slot, onUploadComplete }: {
             ? 'Take a new photo with your camera' 
             : 'Choose from your phone\'s photo gallery'
           }
+          <br />
+          <span className="text-blue-600">Photos are automatically compressed to reduce file size</span>
         </p>
         
         {file && (
           <div className="mb-2 text-xs text-gray-600">
             Selected: {file.name} ({(file.size / 1024 / 1024).toFixed(2)}MB)
-            {file.size > 3 * 1024 * 1024 && (
+            {file.size > 2 * 1024 * 1024 && (
               <div className="text-blue-600 mt-1">
-                Large file - will be automatically compressed to reduce size
+                Large file - will be compressed significantly to meet storage limits
               </div>
             )}
           </div>
