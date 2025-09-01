@@ -9,67 +9,54 @@ interface PhotoUploadManagerProps {
 // Compress image before upload
 function compressImage(file: File, maxWidth: number = 1600, quality: number = 0.7): Promise<File> {
   return new Promise((resolve) => {
-    try {
-      const canvas = document.createElement('canvas')
-      const ctx = canvas.getContext('2d')
-      
-      if (!ctx) {
-        console.warn('Canvas context not available, using original file')
-        resolve(file)
-        return
-      }
-      
-      const img = new Image()
-      
-      img.onerror = () => {
-        console.warn('Image load error, using original file')
-        resolve(file)
-      }
+    // Simple compression approach
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    const img = new Image()
     
-      img.onload = () => {
-        try {
-          // Calculate new dimensions
-          let { width, height } = img
-          if (width > maxWidth) {
-            height = (height * maxWidth) / width
-            width = maxWidth
-          }
-          
-          // Also check height and adjust if needed
-          const maxHeight = 1200
-          if (height > maxHeight) {
-            width = (width * maxHeight) / height
-            height = maxHeight
-          }
-          
-          canvas.width = width
-          canvas.height = height
-          
-          // Draw and compress
-          ctx.drawImage(img, 0, 0, width, height)
-          canvas.toBlob((blob) => {
-            if (blob) {
-              const compressedFile = new File([blob], file.name, {
-                type: 'image/jpeg',
-                lastModified: Date.now()
-              })
-              resolve(compressedFile)
-            } else {
-              console.warn('Canvas toBlob failed, using original file')
-              resolve(file)
-            }
-          }, 'image/jpeg', quality)
-        } catch (error) {
-          console.warn('Image compression failed, using original file:', error)
-          resolve(file)
+    img.onload = () => {
+      // Calculate new dimensions - more aggressive sizing
+      let { width, height } = img
+      const maxDimension = 800 // Smaller max size
+      
+      if (width > height) {
+        if (width > maxDimension) {
+          height = (height * maxDimension) / width
+          width = maxDimension
+        }
+      } else {
+        if (height > maxDimension) {
+          width = (width * maxDimension) / height
+          height = maxDimension
         }
       }
+      
+      canvas.width = width
+      canvas.height = height
+      
+      ctx?.drawImage(img, 0, 0, width, height)
+      
+      canvas.toBlob((blob) => {
+        if (blob && blob.size < 5 * 1024 * 1024) { // Under 5MB
+          const compressedFile = new File([blob], file.name, {
+            type: 'image/jpeg',
+            lastModified: Date.now()
+          })
+          console.log(`Compressed from ${(file.size / 1024 / 1024).toFixed(2)}MB to ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`)
+          resolve(compressedFile)
+        } else {
+          console.warn('Compression failed or still too large, rejecting file')
+          resolve(file) // This will trigger the size check below
+        }
+      }, 'image/jpeg', 0.5) // Lower quality for smaller files
+    }
     
-      img.src = URL.createObjectURL(file)
-    } catch (error) {
-      console.warn('Image compression setup failed, using original file:', error)
+    img.onerror = () => {
+      console.warn('Image load failed')
       resolve(file)
     }
+    
+    img.src = URL.createObjectURL(file)
   })
 }
 
@@ -98,9 +85,9 @@ function VehiclePhotoUpload({ vehicleId, slot, onUploadComplete }: {
   const handleUpload = async () => {
     if (!file) return;
     
-    // Check initial file size - reject if over 20MB
-    if (file.size > 50 * 1024 * 1024) {
-      alert('Image file is too large (over 50MB). Please take a new photo or select a smaller image.');
+    // Check initial file size - reject if over 10MB
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Image file is too large (over 10MB). Please take a new photo with your camera instead of selecting from gallery.');
       return;
     }
     
@@ -113,33 +100,22 @@ function VehiclePhotoUpload({ vehicleId, slot, onUploadComplete }: {
         return;
       }
 
-      // More aggressive compression for production
-      const compressedFile = await compressImage(file, 1600, 0.7);
-      console.log(`Original size: ${(file.size / 1024 / 1024).toFixed(2)}MB, Compressed size: ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+      // Compress the image
+      const compressedFile = await compressImage(file);
       
-      // Final size check - must be under 10MB for Supabase
-      if (compressedFile.size > 10 * 1024 * 1024) {
-        // Try ultra compression
-        const ultraCompressed = await compressImage(file, 1200, 0.5);
-        console.log(`Ultra compressed size: ${(ultraCompressed.size / 1024 / 1024).toFixed(2)}MB`);
-        
-        if (ultraCompressed.size > 10 * 1024 * 1024) {
-          alert('Image is still too large after compression. Please try taking a new photo with your camera instead of selecting from gallery.');
-          return;
-        }
-        
-        // Upload ultra compressed version
-        await uploadFile(ultraCompressed, slot);
-      } else {
-        // Upload normally compressed file
-        await uploadFile(compressedFile, slot);
+      // Final size check - must be under 5MB for reliable upload
+      if (compressedFile.size > 5 * 1024 * 1024) {
+        alert('Image is still too large after compression. Please take a new photo with your camera instead of selecting from gallery.');
+        return;
       }
       
+      await uploadFile(compressedFile, slot);
       setCompressing(false);
       alert('Photo uploaded successfully!');
       setFile(null);
       onUploadComplete();
     } catch (error) {
+      console.error('Upload error:', error);
       alert('Upload failed: ' + (error as Error).message);
     } finally {
       setUploading(false);
@@ -253,15 +229,15 @@ function VehiclePhotoUpload({ vehicleId, slot, onUploadComplete }: {
             : 'Choose from your phone\'s photo gallery'
           }
           <br />
-          <span className="text-blue-600">Photos are automatically compressed to reduce file size</span>
+          <span className="text-blue-600">Photos are compressed to under 5MB for upload</span>
         </p>
         
         {file && (
           <div className="mb-2 text-xs text-gray-600">
             Selected: {file.name} ({(file.size / 1024 / 1024).toFixed(2)}MB)
-            {file.size > 1 * 1024 * 1024 && (
+            {file.size > 5 * 1024 * 1024 && (
               <div className="text-blue-600 mt-1">
-                Large file - will be compressed to under 5MB for upload
+                Large file - will be compressed for upload
               </div>
             )}
           </div>
