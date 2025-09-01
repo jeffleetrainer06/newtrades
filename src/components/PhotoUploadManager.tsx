@@ -9,44 +9,67 @@ interface PhotoUploadManagerProps {
 // Compress image before upload
 function compressImage(file: File, maxWidth: number = 1600, quality: number = 0.7): Promise<File> {
   return new Promise((resolve) => {
-    const canvas = document.createElement('canvas')
-    const ctx = canvas.getContext('2d')!
-    const img = new Image()
+    try {
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      
+      if (!ctx) {
+        console.warn('Canvas context not available, using original file')
+        resolve(file)
+        return
+      }
+      
+      const img = new Image()
+      
+      img.onerror = () => {
+        console.warn('Image load error, using original file')
+        resolve(file)
+      }
     
-    img.onload = () => {
-      // Calculate new dimensions
-      let { width, height } = img
-      if (width > maxWidth) {
-        height = (height * maxWidth) / width
-        width = maxWidth
-      }
-      
-      // Also check height and adjust if needed
-      const maxHeight = 1200
-      if (height > maxHeight) {
-        width = (width * maxHeight) / height
-        height = maxHeight
-      }
-      
-      canvas.width = width
-      canvas.height = height
-      
-      // Draw and compress
-      ctx.drawImage(img, 0, 0, width, height)
-      canvas.toBlob((blob) => {
-        if (blob) {
-          const compressedFile = new File([blob], file.name, {
-            type: 'image/jpeg',
-            lastModified: Date.now()
-          })
-          resolve(compressedFile)
-        } else {
+      img.onload = () => {
+        try {
+          // Calculate new dimensions
+          let { width, height } = img
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width
+            width = maxWidth
+          }
+          
+          // Also check height and adjust if needed
+          const maxHeight = 1200
+          if (height > maxHeight) {
+            width = (width * maxHeight) / height
+            height = maxHeight
+          }
+          
+          canvas.width = width
+          canvas.height = height
+          
+          // Draw and compress
+          ctx.drawImage(img, 0, 0, width, height)
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name, {
+                type: 'image/jpeg',
+                lastModified: Date.now()
+              })
+              resolve(compressedFile)
+            } else {
+              console.warn('Canvas toBlob failed, using original file')
+              resolve(file)
+            }
+          }, 'image/jpeg', quality)
+        } catch (error) {
+          console.warn('Image compression failed, using original file:', error)
           resolve(file)
         }
-      }, 'image/jpeg', quality)
-    }
+      }
     
-    img.src = URL.createObjectURL(file)
+      img.src = URL.createObjectURL(file)
+    } catch (error) {
+      console.warn('Image compression setup failed, using original file:', error)
+      resolve(file)
+    }
   })
 }
 
