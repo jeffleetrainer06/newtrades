@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase, Vehicle } from '../lib/supabase'
-import { VehicleCard } from './VehicleCard' // Ensure this import is correct too
+import { VehicleCard } from './VehicleCard'
 import { Search, Filter } from 'lucide-react'
 
-export function VehicleGrid() { // <--- This line is crucial
+export function VehicleGrid() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -135,4 +135,3 @@ export function VehicleGrid() { // <--- This line is crucial
     </div>
   )
 }
-
