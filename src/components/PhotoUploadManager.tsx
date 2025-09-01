@@ -98,6 +98,12 @@ function VehiclePhotoUpload({ vehicleId, slot, onUploadComplete }: {
   const handleUpload = async () => {
     if (!file) return;
     
+    // Check initial file size - reject if over 20MB
+    if (file.size > 20 * 1024 * 1024) {
+      alert('Image file is too large (over 20MB). Please take a new photo or select a smaller image.');
+      return;
+    }
+    
     setUploading(true);
     setCompressing(true);
     
@@ -107,81 +113,29 @@ function VehiclePhotoUpload({ vehicleId, slot, onUploadComplete }: {
         return;
       }
 
-      // Compress the image before upload
-      const compressedFile = await compressImage(file, 1200, 0.4);
+      // More aggressive compression for production
+      const compressedFile = await compressImage(file, 800, 0.3);
       console.log(`Original size: ${(file.size / 1024 / 1024).toFixed(2)}MB, Compressed size: ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
       
-      // Final size check after compression
-      if (compressedFile.size > 10 * 1024 * 1024) {
-        // Try even more aggressive compression
-        const superCompressed = await compressImage(file, 800, 0.3);
-        console.log(`Super compressed size: ${(superCompressed.size / 1024 / 1024).toFixed(2)}MB`);
+      // Final size check - must be under 5MB for Supabase
+      if (compressedFile.size > 5 * 1024 * 1024) {
+        // Try ultra compression
+        const ultraCompressed = await compressImage(file, 600, 0.2);
+        console.log(`Ultra compressed size: ${(ultraCompressed.size / 1024 / 1024).toFixed(2)}MB`);
         
-        if (superCompressed.size > 10 * 1024 * 1024) {
-          alert('Image is still too large after compression. Please try a different photo or take a new one.');
+        if (ultraCompressed.size > 5 * 1024 * 1024) {
+          alert('Image is still too large after maximum compression. Please take a new photo with your camera instead of selecting from gallery.');
           return;
         }
         
-        // Use the super compressed version
-        const fileName = `${slot}_${Date.now()}.jpg`;
-        
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('vehicle-photos')
-          .upload(fileName, superCompressed, {
-            upsert: true,
-            contentType: 'image/jpeg',
-            cacheControl: '3600'
-          });
-        
-        if (uploadError) {
-          alert('Storage upload failed: ' + uploadError.message);
-          return;
-        }
+        // Upload ultra compressed version
+        await uploadFile(ultraCompressed, slot);
       } else {
-        // Use normally compressed file
-        const fileName = `${slot}_${Date.now()}.jpg`;
-        
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('vehicle-photos')
-          .upload(fileName, compressedFile, {
-            upsert: true,
-            contentType: 'image/jpeg',
-            cacheControl: '3600'
-          });
-        
-        if (uploadError) {
-          alert('Storage upload failed: ' + uploadError.message);
-          return;
-        }
+        // Upload normally compressed file
+        await uploadFile(compressedFile, slot);
       }
+      
       setCompressing(false);
-
-      const fileName = `${slot}_${Date.now()}.jpg`;
-
-      const { data: urlData } = supabase.storage
-        .from('vehicle-photos')
-        .getPublicUrl(fileName);
-      
-      const { error: deleteError } = await supabase
-        .from('vehicle_photos')
-        .delete()
-        .eq('vehicle_id', vehicleId)
-        .eq('photo_type', slot)
-      
-      const { error: dbError } = await supabase
-        .from('vehicle_photos')
-        .insert([{
-          vehicle_id: vehicleId,
-          photo_type: slot,
-          photo_url: urlData?.publicUrl || '',
-          sort_order: PHOTO_TYPES.findIndex(type => type.id === slot)
-        }])
-
-      if (dbError) {
-        alert('Database error: ' + dbError.message);
-        return;
-      }
-
       alert('Photo uploaded successfully!');
       setFile(null);
       onUploadComplete();
@@ -193,6 +147,46 @@ function VehiclePhotoUpload({ vehicleId, slot, onUploadComplete }: {
     }
   };
 
+  const uploadFile = async (fileToUpload: File, slot: string) => {
+    const fileName = `${slot}_${Date.now()}.jpg`;
+    
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('vehicle-photos')
+      .upload(fileName, fileToUpload, {
+        upsert: true,
+        contentType: 'image/jpeg',
+        cacheControl: '3600'
+      });
+    
+    if (uploadError) {
+      throw new Error('Storage upload failed: ' + uploadError.message);
+    }
+    
+    const { data: urlData } = supabase.storage
+      .from('vehicle-photos')
+      .getPublicUrl(fileName);
+    
+    // Delete existing photo of this type
+    const { error: deleteError } = await supabase
+      .from('vehicle_photos')
+      .delete()
+      .eq('vehicle_id', vehicleId)
+      .eq('photo_type', slot)
+    
+    // Insert new photo record
+    const { error: dbError } = await supabase
+      .from('vehicle_photos')
+      .insert([{
+        vehicle_id: vehicleId,
+        photo_type: slot,
+        photo_url: urlData?.publicUrl || '',
+        sort_order: PHOTO_TYPES.findIndex(type => type.id === slot)
+      }])
+    if (dbError) {
+      throw new Error('Database error: ' + dbError.message);
+    }
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
@@ -201,9 +195,9 @@ function VehiclePhotoUpload({ vehicleId, slot, onUploadComplete }: {
         return;
       }
       
-      // Check if file is too large (over 50MB)
-      if (selectedFile.size > 50 * 1024 * 1024) {
-        alert('Image file is too large (over 50MB). Please try taking a new photo or selecting a smaller image.');
+      // Check if file is too large (over 20MB)
+      if (selectedFile.size > 20 * 1024 * 1024) {
+        alert('Image file is too large (over 20MB). Please try taking a new photo with your camera instead of selecting from gallery.');
         return;
       }
       
@@ -265,9 +259,9 @@ function VehiclePhotoUpload({ vehicleId, slot, onUploadComplete }: {
         {file && (
           <div className="mb-2 text-xs text-gray-600">
             Selected: {file.name} ({(file.size / 1024 / 1024).toFixed(2)}MB)
-            {file.size > 2 * 1024 * 1024 && (
+            {file.size > 1 * 1024 * 1024 && (
               <div className="text-blue-600 mt-1">
-                Large file - will be compressed significantly to meet storage limits
+                Large file - will be compressed to under 5MB for upload
               </div>
             )}
           </div>
